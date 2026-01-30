@@ -2,14 +2,14 @@
 
 This repository provides a complete Docker Compose-based PostgreSQL database server designed for hosting multiple project databases on a VPS. It includes connection pooling, administration tools, and automated backup/restore capabilities for managing multiple databases efficiently.
 
-## 🏗️ Architecture
+## Architecture
 
 The environment consists of the following services:
 
 - **PostgreSQL 18.1 (Alpine)**: Main database server with common extensions enabled
-- **PgBouncer**: Connection pooler for efficient database connection management across all databases
-- **PgAdmin4**: Web-based database administration interface for all databases
-- **db_utils**: Utility container for backup, restore, and database management operations
+- **PgBouncer 1.25.1**: Connection pooler for efficient database connection management across all databases
+- **PgAdmin4 9.11**: Web-based database administration interface for all databases
+- **db_utils**: On-demand utility container for backup, restore, and database management operations
 
 ### Resource Limits
 
@@ -18,9 +18,15 @@ All services have resource limits configured for optimal performance and resourc
 - **PostgreSQL**: 2 CPUs / 2GB RAM (limit), 1 CPU / 1GB RAM (reserved)
 - **PgBouncer**: 0.5 CPUs / 512MB RAM (limit), 0.25 CPUs / 256MB RAM (reserved)
 - **PgAdmin**: 0.5 CPUs / 512MB RAM (limit), 0.25 CPUs / 256MB RAM (reserved)
-- **db_utils**: 0.5 CPUs / 256MB RAM (limit), 0.1 CPUs / 128MB RAM (reserved)
+- **db_utils**: 0.5 CPUs / 256MB RAM (limit), 0.1 CPUs / 128MB RAM (reserved) - only when running
 
-## 📋 Prerequisites
+### Security by Default
+
+- All ports are bound to `127.0.0.1` (localhost only) by default
+- PgAdmin requires master password and runs in server mode
+- Performance tuning via external `postgresql.conf` file
+
+## Prerequisites
 
 - Docker Engine 20.10 or higher
 - Docker Compose 2.0 or higher
@@ -28,7 +34,7 @@ All services have resource limits configured for optimal performance and resourc
 - 5GB+ of available disk space (depending on database sizes)
 - (For VPS deployment) Properly configured firewall
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Method 1: Using the Initialization Script (Recommended)
 
@@ -96,7 +102,7 @@ Once all services are running:
 - **PgBouncer (Pooled Connection)**: `localhost:6432`
 - **PgAdmin Web Interface**: `http://localhost:5050`
 
-## 🛠️ Initialization Script Features
+## Initialization Script Features
 
 The `init.sh` script provides idempotent initialization and management:
 
@@ -153,34 +159,33 @@ The `env-check.sh` script validates:
 ./scripts/env-check.sh --strict
 ```
 
-## 🗄️ Multi-Database Management
+## Multi-Database Management
 
 This setup is designed to host multiple project databases on a single PostgreSQL server.
 
 ### Creating a New Database for a Project
 
 ```bash
-# Method 1: Using psql
-docker compose exec db_utils psql -h postgres -U postgres -c "CREATE DATABASE myproject_db;"
+# Method 1: Using psql (with profile)
+docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -c "CREATE DATABASE myproject_db;"
 
 # Method 2: Using PgAdmin web interface
 # 1. Open http://localhost:5050
-# 2. Right-click on "Databases" → "Create" → "Database"
+# 2. Right-click on "Databases" -> "Create" -> "Database"
 # 3. Enter database name and save
 ```
 
 ### Listing All Databases
 
 ```bash
-# List all databases with sizes and connection info
-docker compose exec db_utils list-databases.sh
+docker compose --profile tools run --rm db_utils list-databases.sh
 ```
 
 ### Connecting to a Specific Database
 
 ```bash
 # Connect via psql
-docker compose exec db_utils psql -h postgres -U postgres -d myproject_db
+docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -d myproject_db
 
 # Connection string for applications
 ******localhost:5432/myproject_db
@@ -192,7 +197,7 @@ docker compose exec db_utils psql -h postgres -U postgres -d myproject_db
 
 ```bash
 # Create a dedicated user for a project
-docker compose exec db_utils psql -h postgres -U postgres << EOF
+docker compose --profile tools run --rm db_utils psql -h postgres -U postgres << EOF
 CREATE USER myproject_user WITH PASSWORD 'secure_password';
 GRANT ALL PRIVILEGES ON DATABASE myproject_db TO myproject_user;
 \c myproject_db
@@ -204,7 +209,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO myproject_us
 EOF
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -231,52 +236,53 @@ PGBOUNCER_MAX_DB_CONNECTIONS=50        # Max database connections
 
 #### PgAdmin Configuration
 ```env
-PGADMIN_EMAIL=admin@example.com        # Login email
-PGADMIN_PASSWORD=admin                  # Login password (change in production!)
-PGADMIN_PORT=5050                       # Web interface port
+PGADMIN_EMAIL=admin@example.com                  # Login email
+PGADMIN_PASSWORD=CHANGE_THIS_ADMIN_PASSWORD      # Login password (CHANGE THIS!)
+PGADMIN_PORT=5050                                # Web interface port
 ```
 
 ### Database Initialization
 
-The `init-db.sql` script runs automatically on first startup and:
+The `init-db.sql` script runs automatically on first startup and enables common PostgreSQL extensions in template1 (`uuid-ossp`, `pg_stat_statements`, `pg_trgm`, `btree_gist`, `hstore`). All extensions are automatically available for new databases created after initialization.
 
-1. Enables common PostgreSQL extensions in template1 (`uuid-ossp`, `pg_stat_statements`, `pg_trgm`, `btree_gist`, `hstore`)
-2. Configures performance settings optimized for multi-database usage
-3. All extensions are automatically available for new databases created after initialization
+### Performance Configuration
+
+Performance tuning is managed via `postgresql.conf` file which is mounted into the container. This includes:
+
+- `shared_preload_libraries = 'pg_stat_statements'`
+- Memory settings (shared_buffers, work_mem, etc.)
+- WAL configuration
+- Query planner settings
 
 **Note**: This script does NOT create project-specific databases or schemas. You create those as needed for each project.
 
-## 💾 Backup & Restore Operations
+## Backup & Restore Operations
+
+The `db_utils` container runs on-demand using Docker Compose profiles.
 
 ### Backing Up a Specific Database
 
 ```bash
-# Backup a single database
-docker compose exec db_utils backup.sh myproject_db
-
-# This creates: /backups/myproject_db_backup_YYYYMMDD_HHMMSS.sql.gz
+docker compose --profile tools run --rm db_utils backup.sh myproject_db
 ```
 
 ### Backing Up All Databases
 
 ```bash
-# Backup all user databases at once
-docker compose exec db_utils backup-all.sh
-
-# This creates separate backups for each database
+docker compose --profile tools run --rm db_utils backup-all.sh
 ```
 
 ### Restoring from Backup
 
 ```bash
 # List available backups
-docker compose exec db_utils ls -lh /backups
+ls -lh ./backups/
 
 # Restore to original database (extracted from filename)
-docker compose exec db_utils restore.sh /backups/myproject_db_backup_20240101_120000.sql.gz
+docker compose --profile tools run --rm db_utils restore.sh /backups/myproject_db_backup_20240101_120000.sql.gz
 
 # Restore to a different database
-docker compose exec db_utils restore.sh /backups/myproject_db_backup_20240101_120000.sql.gz new_database_name
+docker compose --profile tools run --rm db_utils restore.sh /backups/myproject_db_backup_20240101_120000.sql.gz new_database_name
 ```
 
 ⚠️ **Warning**: Restore operations will replace all current data in the target database!
@@ -288,14 +294,13 @@ For production VPS deployment, set up automated backups using cron:
 ```bash
 # Add to crontab (crontab -e)
 # Backup all databases daily at 2 AM
-0 2 * * * cd /path/to/repo && docker compose exec -T db_utils backup-all.sh >> /var/log/postgres-backup.log 2>&1
+0 2 * * * cd /path/to/repo && docker compose --profile tools run --rm db_utils backup-all.sh >> /var/log/postgres-backup.log 2>&1
 
 # Backup specific critical database every 6 hours
-0 */6 * * * cd /path/to/repo && docker compose exec -T db_utils backup.sh critical_db >> /var/log/postgres-backup.log 2>&1
-```
+0 */6 * * * cd /path/to/repo && docker compose --profile tools run --rm db_utils backup.sh critical_db >> /var/log/postgres-backup.log 2>&1
 ```
 
-## 🔌 Connecting to Databases
+## Connecting to Databases
 
 ### From Your Applications (Recommended: Use PgBouncer)
 
@@ -324,7 +329,7 @@ postgresql://postgres:your_password@localhost:5432/database_name
 psql -h localhost -p 5432 -U postgres -d myproject_db
 
 # From within the db_utils container
-docker compose exec db_utils psql -h postgres -U postgres -d myproject_db
+docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -d myproject_db
 ```
 
 ### From Remote Servers/VPS
@@ -339,7 +344,7 @@ postgresql://postgres:password@your-vps-ip:5432/database_name
 postgresql://postgres:password@your-vps-ip:6432/database_name
 ```
 
-## 🖥️ Using PgAdmin
+## Using PgAdmin
 
 1. Open your browser and navigate to `http://localhost:5050` (or `http://your-vps-ip:5050`)
 2. Login with credentials from your `.env` file
@@ -354,29 +359,29 @@ postgresql://postgres:password@your-vps-ip:6432/database_name
 
 Now you can see and manage all databases on the server from PgAdmin.
 
-## 📊 Monitoring & Performance
+## Monitoring & Performance
 
 ### Check All Databases Status
 
 ```bash
 # List all databases with sizes and connections
-docker compose exec db_utils list-databases.sh
+docker compose --profile tools run --rm db_utils list-databases.sh
 
 # View active connections across all databases
-docker compose exec db_utils psql -h postgres -U postgres -c "SELECT datname, count(*) as connections FROM pg_stat_activity GROUP BY datname;"
+docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -c "SELECT datname, count(*) as connections FROM pg_stat_activity GROUP BY datname;"
 
 # View all database sizes
-docker compose exec db_utils psql -h postgres -U postgres -c "\l+"
+docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -c "\l+"
 
 # Check query statistics for a specific database
-docker compose exec db_utils psql -h postgres -U postgres -d myproject_db -c "SELECT * FROM pg_stat_statements LIMIT 10;"
+docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -d myproject_db -c "SELECT * FROM pg_stat_statements LIMIT 10;"
 ```
 
 ### Performance Monitoring
 
 ```bash
 # Check slow queries across all databases
-docker compose exec db_utils psql -h postgres -U postgres << EOF
+docker compose --profile tools run --rm db_utils psql -h postgres -U postgres << EOF
 SELECT 
     datname,
     query,
@@ -392,7 +397,7 @@ LIMIT 20;
 EOF
 
 # Monitor database sizes over time
-docker compose exec db_utils psql -h postgres -U postgres -c "
+docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -c "
 SELECT 
     datname AS database,
     pg_size_pretty(pg_database_size(datname)) AS size
@@ -418,7 +423,7 @@ SHOW CLIENTS;
 SHOW SERVERS;
 ```
 
-## 🛠️ Maintenance Commands
+## Maintenance Commands
 
 ### Stop Services
 
@@ -462,7 +467,7 @@ docker compose pull
 docker compose up -d --force-recreate
 ```
 
-## 🔒 Security Best Practices for VPS Deployment
+## Security Best Practices for VPS Deployment
 
 ### Essential Security Measures
 
@@ -504,7 +509,7 @@ docker compose up -d --force-recreate
 4. **Create project-specific database users** (never use superuser for applications):
    ```bash
    # Each project should have its own user with limited privileges
-   docker compose exec db_utils psql -h postgres -U postgres << EOF
+   docker compose --profile tools run --rm db_utils psql -h postgres -U postgres << EOF
    CREATE USER project1_user WITH PASSWORD 'strong_password_here';
    GRANT CONNECT ON DATABASE project1_db TO project1_user;
    \c project1_db
@@ -547,17 +552,16 @@ docker compose up -d --force-recreate
 
 9. **Limit PgAdmin exposure**:
    ```bash
-   # Option 1: Use reverse proxy with authentication
-   # Option 2: Only expose on localhost and use SSH tunnel
-   # In docker-compose.yml, change:
-   ports:
-     - "127.0.0.1:5050:80"  # Only accessible from localhost
+   # PgAdmin is already bound to localhost by default (127.0.0.1:5050:80)
+   # For remote access, use SSH tunnel:
+   ssh -L 5050:localhost:5050 user@your-vps-ip
+   # Then access http://localhost:5050 from your local machine
    ```
 
 10. **Database connection limits**:
     ```bash
     # Set per-database connection limits to prevent resource exhaustion
-    docker compose exec db_utils psql -h postgres -U postgres -c "
+    docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -c "
     ALTER DATABASE myproject_db CONNECTION LIMIT 50;
     "
     ```
@@ -586,7 +590,7 @@ rsync -avz /path/to/backups/ user@backup-server:/backups/
 aws s3 sync /path/to/backups/ s3://your-bucket/postgres-backups/
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Services won't start
 
@@ -604,7 +608,7 @@ sudo lsof -i :5050
 ### Cannot connect to database
 
 1. Verify services are running: `docker compose ps`
-2. Check network connectivity: `docker compose exec db_utils ping postgres`
+2. Check network connectivity: `docker compose --profile tools run --rm db_utils ping postgres`
 3. Verify credentials in `.env` file
 4. Review PostgreSQL logs: `docker compose logs postgres`
 
@@ -617,20 +621,20 @@ sudo lsof -i :5050
 ### Backup/Restore fails
 
 1. Check disk space: `df -h`
-2. Verify backup directory permissions
-3. Review db_utils logs: `docker compose logs db_utils`
+2. Verify backup directory permissions: `ls -la ./backups/`
+3. Run db_utils interactively for debugging: `docker compose --profile tools run --rm db_utils sh`
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [PgBouncer Documentation](https://www.pgbouncer.org/usage.html)
 - [PgAdmin Documentation](https://www.pgadmin.org/docs/)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
 
-## 📝 License
+## License
 
 This project is provided as-is for development and testing purposes.
 
-## 🤝 Contributing
+## Contributing
 
 Feel free to open issues or submit pull requests with improvements!

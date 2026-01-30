@@ -16,13 +16,17 @@ DB_HOST="${POSTGRES_HOST:-postgres}"
 DB_PORT="${POSTGRES_PORT:-5432}"
 BACKUP_DIR="/backups"
 
-# Try to resolve hostname, fallback to getent or direct connection
-if ! ping -c 1 -W 1 ${DB_HOST} >/dev/null 2>&1; then
-    # Try to get IP from /etc/hosts or links
-    DB_IP=$(grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+[[:space:]]+postgres" /etc/hosts | head -1 | awk '{print $1}')
-    if [ -n "$DB_IP" ]; then
-        DB_HOST="$DB_IP"
+resolve_host() {
+    if command -v getent >/dev/null 2>&1; then
+        getent hosts "$1" 2>/dev/null | awk '{print $1}' | head -1
+    else
+        grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+[[:space:]]+$1" /etc/hosts 2>/dev/null | head -1 | awk '{print $1}'
     fi
+}
+
+DB_RESOLVED=$(resolve_host "${DB_HOST}")
+if [ -n "$DB_RESOLVED" ]; then
+    DB_HOST="$DB_RESOLVED"
 fi
 
 # Check if backup file was provided as argument
@@ -33,7 +37,7 @@ if [ -z "$1" ]; then
     echo "Usage: restore.sh <backup_file> [database_name]"
     echo ""
     echo "Available backups in ${BACKUP_DIR}:"
-    ls -lh ${BACKUP_DIR}/*.sql* 2>/dev/null || echo "No backup files found"
+    ls -lh "${BACKUP_DIR}"/*.sql* 2>/dev/null || echo "No backup files found"
     echo "============================================"
     echo "Examples:"
     echo "  # Restore to database specified in backup filename or POSTGRES_DB env var:"
@@ -83,27 +87,28 @@ echo ""
 echo "Proceeding with restore in 5 seconds... (Press Ctrl+C to cancel)"
 sleep 5
 
-# Determine if file is compressed
-if [[ "${BACKUP_FILE}" == *.gz ]]; then
-    echo "Decompressing and restoring from compressed backup..."
-    gunzip -c ${BACKUP_FILE} | psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1
-else
-    echo "Restoring from uncompressed backup..."
-    psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -v ON_ERROR_STOP=1 -f ${BACKUP_FILE}
-fi
+restore_result=0
+case "${BACKUP_FILE}" in
+    *.gz)
+        echo "Decompressing and restoring from compressed backup..."
+        gunzip -c "${BACKUP_FILE}" | psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 || restore_result=1
+        ;;
+    *)
+        echo "Restoring from uncompressed backup..."
+        psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -f "${BACKUP_FILE}" || restore_result=1
+        ;;
+esac
 
-# Check if restore was successful
-if [ $? -eq 0 ]; then
+if [ $restore_result -eq 0 ]; then
     echo "============================================"
-    echo "✓ Restore completed successfully!"
+    echo "Restore completed successfully!"
     echo "============================================"
     
-    # Display database size
     echo "Current database size:"
-    psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -c "\l+ ${DB_NAME}"
+    psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}" -c "\l+ ${DB_NAME}"
 else
     echo "============================================"
-    echo "✗ Restore failed"
+    echo "Restore failed"
     echo "============================================"
     exit 1
 fi

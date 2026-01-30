@@ -31,21 +31,21 @@ echo ""
 
 # Helper functions
 error() {
-    echo "${RED}✗ ERROR: $1${NC}"
+    printf "${RED}✗ ERROR: %s${NC}\n" "$1"
     ERRORS=$((ERRORS + 1))
 }
 
 warning() {
-    echo "${YELLOW}⚠ WARNING: $1${NC}"
+    printf "${YELLOW}⚠ WARNING: %s${NC}\n" "$1"
     WARNINGS=$((WARNINGS + 1))
 }
 
 success() {
-    echo "${GREEN}✓ $1${NC}"
+    printf "${GREEN}✓ %s${NC}\n" "$1"
 }
 
 info() {
-    echo "  $1"
+    printf "  %s\n" "$1"
 }
 
 # Check if .env file exists
@@ -194,26 +194,26 @@ echo ""
 echo "============================================"
 echo "Validation Summary"
 echo "============================================"
-echo "${RED}Errors: $ERRORS${NC}"
-echo "${YELLOW}Warnings: $WARNINGS${NC}"
+printf "${RED}Errors: %d${NC}\n" "$ERRORS"
+printf "${YELLOW}Warnings: %d${NC}\n" "$WARNINGS"
 echo ""
 
 if [ $ERRORS -gt 0 ]; then
-    echo "${RED}✗ Validation FAILED${NC}"
+    printf "${RED}✗ Validation FAILED${NC}\n"
     echo "Please fix the errors above before starting the services."
     exit 1
 elif [ $WARNINGS -gt 0 ]; then
     if [ $STRICT_MODE -eq 1 ]; then
-        echo "${YELLOW}⚠ Validation completed with warnings (strict mode)${NC}"
+        printf "${YELLOW}⚠ Validation completed with warnings (strict mode)${NC}\n"
         echo "Fix warnings or run without --strict flag."
         exit 1
     else
-        echo "${YELLOW}⚠ Validation completed with warnings${NC}"
+        printf "${YELLOW}⚠ Validation completed with warnings${NC}\n"
         echo "Review warnings above. Services can start but may not be production-ready."
         exit 0
     fi
 else
-    echo "${GREEN}✓ Validation PASSED${NC}"
+    printf "${GREEN}✓ Validation PASSED${NC}\n"
     echo "All environment variables are properly configured!"
     exit 0
 fi

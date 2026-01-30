@@ -12,12 +12,17 @@ DB_USER="${POSTGRES_USER:-postgres}"
 DB_HOST="${POSTGRES_HOST:-postgres}"
 DB_PORT="${POSTGRES_PORT:-5432}"
 
-# Try to resolve hostname, fallback to IP
-if ! ping -c 1 -W 1 ${DB_HOST} >/dev/null 2>&1; then
-    DB_IP=$(grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+[[:space:]]+postgres" /etc/hosts | head -1 | awk '{print $1}')
-    if [ -n "$DB_IP" ]; then
-        DB_HOST="$DB_IP"
+resolve_host() {
+    if command -v getent >/dev/null 2>&1; then
+        getent hosts "$1" 2>/dev/null | awk '{print $1}' | head -1
+    else
+        grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+[[:space:]]+$1" /etc/hosts 2>/dev/null | head -1 | awk '{print $1}'
     fi
+}
+
+DB_RESOLVED=$(resolve_host "${DB_HOST}")
+if [ -n "$DB_RESOLVED" ]; then
+    DB_HOST="$DB_RESOLVED"
 fi
 
 echo "============================================"
@@ -29,7 +34,7 @@ echo "============================================"
 echo ""
 
 # List all databases with size information
-psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d postgres -c "
+psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d postgres -c "
 SELECT 
     d.datname AS \"Database\",
     pg_catalog.pg_get_userbyid(d.datdba) AS \"Owner\",
@@ -58,7 +63,7 @@ echo "============================================"
 echo "Active Connections by Database"
 echo "============================================"
 
-psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d postgres -c "
+psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d postgres -c "
 SELECT 
     datname AS \"Database\",
     COUNT(*) AS \"Connections\"
