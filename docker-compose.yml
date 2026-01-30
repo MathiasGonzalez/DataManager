@@ -1,0 +1,132 @@
+services:
+  # ============================================
+  # PostgreSQL Database Server
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: datamanager_postgres
+    restart: unless-stopped
+    environment:
+      # Database credentials
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-datamanager}
+      # Performance tuning
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+      # Enable statistics extension
+      POSTGRES_EXTENSIONS: "uuid-ossp pg_stat_statements"
+    volumes:
+      # Persist database data
+      - postgres_data:/var/lib/postgresql/data
+      # Initialize database with extensions and schemas
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      # Backup directory (accessible from host)
+      - ./backups:/backups
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - datamanager_network
+
+  # ============================================
+  # PgBouncer - Connection Pooler
+  # ============================================
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: datamanager_pgbouncer
+    restart: unless-stopped
+    environment:
+      # Database connection
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-datamanager}"
+      # Connection pool configuration
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-100}
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE:-25}
+      MIN_POOL_SIZE: ${PGBOUNCER_MIN_POOL_SIZE:-10}
+      RESERVE_POOL_SIZE: ${PGBOUNCER_RESERVE_POOL_SIZE:-5}
+      # Timeouts (in seconds)
+      SERVER_IDLE_TIMEOUT: ${PGBOUNCER_SERVER_IDLE_TIMEOUT:-600}
+      MAX_DB_CONNECTIONS: ${PGBOUNCER_MAX_DB_CONNECTIONS:-50}
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - datamanager_network
+
+  # ============================================
+  # PgAdmin4 - Web-based Database Administration
+  # ============================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: datamanager_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@datamanager.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_LISTEN_PORT: 80
+      # Disable master password requirement
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      # Persist PgAdmin configuration
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - datamanager_network
+
+  # ============================================
+  # Database Utilities - Backup & Restore
+  # ============================================
+  db_utils:
+    image: postgres:16-alpine
+    container_name: datamanager_db_utils
+    restart: "no"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-datamanager}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      # Access to backup directory
+      - ./backups:/backups
+      # Backup and restore scripts
+      - ./scripts/backup.sh:/usr/local/bin/backup.sh
+      - ./scripts/restore.sh:/usr/local/bin/restore.sh
+    entrypoint: ["/bin/sh"]
+    command: ["-c", "chmod +x /usr/local/bin/*.sh && tail -f /dev/null"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - datamanager_network
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  datamanager_network:
+    driver: bridge
+    name: datamanager_network
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  postgres_data:
+    name: datamanager_postgres_data
+    driver: local
+  pgadmin_data:
+    name: datamanager_pgadmin_data
+    driver: local
