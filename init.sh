@@ -281,21 +281,31 @@ fi
 if [ $START_SERVICES -eq 1 ]; then
     section "Starting Services"
     
-    info "Pulling latest images..."
-    $COMPOSE_CMD pull
-    
-    info "Starting services..."
-    $COMPOSE_CMD up -d
-    
-    echo ""
-    info "Waiting for services to be healthy..."
-    sleep 5
-    
-    echo ""
-    $COMPOSE_CMD ps
-    
-    echo ""
-    success "Services started successfully!"
+    # Check if services are already running
+    RUNNING_CONTAINERS=$($COMPOSE_CMD ps -q 2>/dev/null | wc -l)
+    if [ "$RUNNING_CONTAINERS" -gt 0 ]; then
+        info "Services are already running. Checking status..."
+        $COMPOSE_CMD ps
+        echo ""
+        warning "To restart services, use: ./init.sh --restart"
+        warning "To stop services first, use: ./init.sh --stop"
+    else
+        info "Pulling latest images..."
+        $COMPOSE_CMD pull
+        
+        info "Starting services..."
+        $COMPOSE_CMD up -d
+        
+        echo ""
+        info "Waiting for services to be healthy..."
+        sleep 5
+        
+        echo ""
+        $COMPOSE_CMD ps
+        
+        echo ""
+        success "Services started successfully!"
+    fi
     
     section "Connection Information"
     echo "PostgreSQL Direct:   localhost:${POSTGRES_PORT:-5432}"

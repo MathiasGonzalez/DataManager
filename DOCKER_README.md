@@ -6,10 +6,19 @@ This repository provides a complete Docker Compose-based PostgreSQL database ser
 
 The environment consists of the following services:
 
-- **PostgreSQL (Latest Alpine)**: Main database server with common extensions enabled
+- **PostgreSQL 18.1 (Alpine)**: Main database server with common extensions enabled
 - **PgBouncer**: Connection pooler for efficient database connection management across all databases
 - **PgAdmin4**: Web-based database administration interface for all databases
 - **db_utils**: Utility container for backup, restore, and database management operations
+
+### Resource Limits
+
+All services have resource limits configured for optimal performance and resource management:
+
+- **PostgreSQL**: 2 CPUs / 2GB RAM (limit), 1 CPU / 1GB RAM (reserved)
+- **PgBouncer**: 0.5 CPUs / 512MB RAM (limit), 0.25 CPUs / 256MB RAM (reserved)
+- **PgAdmin**: 0.5 CPUs / 512MB RAM (limit), 0.25 CPUs / 256MB RAM (reserved)
+- **db_utils**: 0.5 CPUs / 256MB RAM (limit), 0.1 CPUs / 128MB RAM (reserved)
 
 ## 📋 Prerequisites
 
@@ -111,6 +120,20 @@ The `init.sh` script provides idempotent initialization and management:
 4. **Creates Directories**: Sets up required directories (backups, etc.)
 5. **Sets Permissions**: Makes all scripts executable
 6. **Optionally Starts Services**: With `--start` flag
+
+### Idempotent Operations
+
+All operations are designed to be idempotent (safe to run multiple times):
+
+- **Start (`--start`)**: Checks if services are already running before attempting to start
+- **Stop (`--stop`)**: Uses `docker compose down` which preserves volumes (data is kept)
+- **Restart (`--restart`)**: Gracefully restarts all running services
+- **Status (`--status`)**: Always safe to check current state
+
+**Important**: 
+- Stopping services (`./init.sh --stop`) preserves all data in volumes
+- Restarting services maintains all database data and configurations
+- Starting already-running services shows current status without changes
 
 ### Environment Validation
 
