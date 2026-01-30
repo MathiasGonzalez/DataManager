@@ -31,21 +31,21 @@ echo ""
 
 # Helper functions
 error() {
-    echo "${RED}✗ ERROR: $1${NC}"
+    printf "${RED}✗ ERROR: %s${NC}\n" "$1"
     ERRORS=$((ERRORS + 1))
 }
 
 warning() {
-    echo "${YELLOW}⚠ WARNING: $1${NC}"
+    printf "${YELLOW}⚠ WARNING: %s${NC}\n" "$1"
     WARNINGS=$((WARNINGS + 1))
 }
 
 success() {
-    echo "${GREEN}✓ $1${NC}"
+    printf "${GREEN}✓ %s${NC}\n" "$1"
 }
 
 info() {
-    echo "  $1"
+    printf "  %s\n" "$1"
 }
 
 # Check if .env file exists
@@ -130,36 +130,6 @@ fi
 echo ""
 
 # ============================================
-# Validate PgAdmin Configuration
-# ============================================
-echo "Validating PgAdmin configuration..."
-
-if [ -z "$PGADMIN_EMAIL" ]; then
-    warning "PGADMIN_EMAIL is not set (will use default)"
-else
-    success "PGADMIN_EMAIL is set: $PGADMIN_EMAIL"
-fi
-
-if [ -z "$PGADMIN_PASSWORD" ]; then
-    error "PGADMIN_PASSWORD is not set"
-elif [ "$PGADMIN_PASSWORD" = "admin" ]; then
-    warning "PGADMIN_PASSWORD is using default weak value"
-    info "Change this to a secure password for production!"
-elif [ ${#PGADMIN_PASSWORD} -lt 6 ]; then
-    warning "PGADMIN_PASSWORD is too short"
-else
-    success "PGADMIN_PASSWORD is set (length: ${#PGADMIN_PASSWORD} chars)"
-fi
-
-if [ -z "$PGADMIN_PORT" ]; then
-    warning "PGADMIN_PORT is not set (will use default: 5050)"
-else
-    success "PGADMIN_PORT is set: $PGADMIN_PORT"
-fi
-
-echo ""
-
-# ============================================
 # Security Checks
 # ============================================
 echo "Security checks..."
@@ -176,16 +146,6 @@ if [ "$POSTGRES_PORT" = "$PGBOUNCER_PORT" ]; then
     info "These must be different ports"
 fi
 
-if [ "$POSTGRES_PORT" = "$PGADMIN_PORT" ]; then
-    error "POSTGRES_PORT and PGADMIN_PORT are the same!"
-    info "These must be different ports"
-fi
-
-if [ "$PGBOUNCER_PORT" = "$PGADMIN_PORT" ]; then
-    error "PGBOUNCER_PORT and PGADMIN_PORT are the same!"
-    info "These must be different ports"
-fi
-
 echo ""
 
 # ============================================
@@ -194,26 +154,26 @@ echo ""
 echo "============================================"
 echo "Validation Summary"
 echo "============================================"
-echo "${RED}Errors: $ERRORS${NC}"
-echo "${YELLOW}Warnings: $WARNINGS${NC}"
+printf "${RED}Errors: %d${NC}\n" "$ERRORS"
+printf "${YELLOW}Warnings: %d${NC}\n" "$WARNINGS"
 echo ""
 
 if [ $ERRORS -gt 0 ]; then
-    echo "${RED}✗ Validation FAILED${NC}"
+    printf "${RED}✗ Validation FAILED${NC}\n"
     echo "Please fix the errors above before starting the services."
     exit 1
 elif [ $WARNINGS -gt 0 ]; then
     if [ $STRICT_MODE -eq 1 ]; then
-        echo "${YELLOW}⚠ Validation completed with warnings (strict mode)${NC}"
+        printf "${YELLOW}⚠ Validation completed with warnings (strict mode)${NC}\n"
         echo "Fix warnings or run without --strict flag."
         exit 1
     else
-        echo "${YELLOW}⚠ Validation completed with warnings${NC}"
+        printf "${YELLOW}⚠ Validation completed with warnings${NC}\n"
         echo "Review warnings above. Services can start but may not be production-ready."
         exit 0
     fi
 else
-    echo "${GREEN}✓ Validation PASSED${NC}"
+    printf "${GREEN}✓ Validation PASSED${NC}\n"
     echo "All environment variables are properly configured!"
     exit 0
 fi

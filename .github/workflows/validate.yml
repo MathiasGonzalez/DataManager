@@ -1,0 +1,57 @@
+name: Validate
+
+on:
+  push:
+    branches: [main, master, develop, test]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  validate-yaml:
+    name: Validate YAML
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: python3 -c "import yaml; yaml.safe_load(open('docker-compose.yml'))"
+
+
+  validate-docker-compose:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create dummy .env
+        run: cp .env.example .env
+
+      - name: Validate docker-compose config
+        run: docker compose config --quiet
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create .env
+        run: cp .env.example .env
+
+      - name: Start services
+        run: docker compose up -d
+
+      - name: Wait for PostgreSQL
+        run: |
+          echo "Waiting for PostgreSQL to be healthy..."
+          timeout 60 bash -c 'until docker compose exec -T postgres pg_isready -U postgres; do sleep 2; done'
+
+      - name: Run tests
+        run: ./tests/run-tests.sh
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

@@ -95,19 +95,19 @@ done
 
 # Helper functions
 error() {
-    echo -e "${RED}✗ ERROR: $1${NC}"
+    printf "${RED}✗ ERROR: %s${NC}\n" "$1"
 }
 
 warning() {
-    echo -e "${YELLOW}⚠ WARNING: $1${NC}"
+    printf "${YELLOW}⚠ WARNING: %s${NC}\n" "$1"
 }
 
 success() {
-    echo -e "${GREEN}✓ $1${NC}"
+    printf "${GREEN}✓ %s${NC}\n" "$1"
 }
 
 info() {
-    echo -e "${BLUE}ℹ $1${NC}"
+    printf "${BLUE}ℹ %s${NC}\n" "$1"
 }
 
 section() {
@@ -282,7 +282,7 @@ if [ $START_SERVICES -eq 1 ]; then
     section "Starting Services"
     
     # Check if services are already running
-    RUNNING_CONTAINERS=$($COMPOSE_CMD ps -q 2>/dev/null | wc -l)
+    RUNNING_CONTAINERS=$($COMPOSE_CMD ps -q 2>/dev/null | wc -l | tr -d ' ')
     if [ "$RUNNING_CONTAINERS" -gt 0 ]; then
         info "Services are already running. Checking status..."
         $COMPOSE_CMD ps
@@ -310,14 +310,13 @@ if [ $START_SERVICES -eq 1 ]; then
     section "Connection Information"
     echo "PostgreSQL Direct:   localhost:${POSTGRES_PORT:-5432}"
     echo "PgBouncer (Pooled):  localhost:${PGBOUNCER_PORT:-6432}"
-    echo "PgAdmin Web UI:      http://localhost:${PGADMIN_PORT:-5050}"
     echo ""
     echo "Default credentials are in your .env file"
     
     section "Useful Commands"
-    echo "List databases:      $COMPOSE_CMD exec db_utils list-databases.sh"
-    echo "Backup database:     $COMPOSE_CMD exec db_utils backup.sh <db_name>"
-    echo "Backup all:          $COMPOSE_CMD exec db_utils backup-all.sh"
+    echo "List databases:      $COMPOSE_CMD --profile tools run --rm db_utils list-databases.sh"
+    echo "Backup database:     $COMPOSE_CMD --profile tools run --rm db_utils backup.sh <db_name>"
+    echo "Backup all:          $COMPOSE_CMD --profile tools run --rm db_utils backup-all.sh"
     echo "View logs:           $COMPOSE_CMD logs -f"
     echo "Stop services:       $COMPOSE_CMD down"
     echo "Check status:        ./init.sh --status"
