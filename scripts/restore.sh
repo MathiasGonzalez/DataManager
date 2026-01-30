@@ -39,12 +39,12 @@ if [ -z "$1" ]; then
     echo "Available backups in ${BACKUP_DIR}:"
     ls -lh "${BACKUP_DIR}"/*.sql* 2>/dev/null || echo "No backup files found"
     echo "============================================"
-    echo "Examples:"
-    echo "  # Restore to database specified in backup filename or POSTGRES_DB env var:"
-    echo "  docker compose exec db_utils restore.sh /backups/myproject_backup_20240101_120000.sql.gz"
-    echo ""
-    echo "  # Restore to specific database:"
-    echo "  docker compose exec db_utils restore.sh /backups/myproject_backup_20240101_120000.sql.gz myproject_db"
+echo "Examples:"
+echo "  # Restore to database specified in backup filename or POSTGRES_DB env var:"
+echo "  docker compose --profile tools run --rm db_utils restore.sh /backups/myproject_backup_20240101_120000.sql.gz"
+echo ""
+echo "  # Restore to specific database:"
+echo "  docker compose --profile tools run --rm db_utils restore.sh /backups/myproject_backup_20240101_120000.sql.gz myproject_db"
     exit 1
 fi
 

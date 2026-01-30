@@ -8,22 +8,19 @@ The environment consists of the following services:
 
 - **PostgreSQL 18.1 (Alpine)**: Main database server with common extensions enabled
 - **PgBouncer 1.25.1**: Connection pooler for efficient database connection management across all databases
-- **PgAdmin4 9.11**: Web-based database administration interface for all databases
 - **db_utils**: On-demand utility container for backup, restore, and database management operations
 
 ### Resource Limits
 
 All services have resource limits configured for optimal performance and resource management:
 
-- **PostgreSQL**: 2 CPUs / 2GB RAM (limit), 1 CPU / 1GB RAM (reserved)
-- **PgBouncer**: 0.5 CPUs / 512MB RAM (limit), 0.25 CPUs / 256MB RAM (reserved)
-- **PgAdmin**: 0.5 CPUs / 512MB RAM (limit), 0.25 CPUs / 256MB RAM (reserved)
-- **db_utils**: 0.5 CPUs / 256MB RAM (limit), 0.1 CPUs / 128MB RAM (reserved) - only when running
+- **PostgreSQL**: 2 CPUs / 2GB RAM
+- **PgBouncer**: 0.5 CPUs / 512MB RAM
+- **db_utils**: 0.5 CPUs / 256MB RAM (only when running)
 
 ### Security by Default
 
 - All ports are bound to `127.0.0.1` (localhost only) by default
-- PgAdmin requires master password and runs in server mode
 - Performance tuning via external `postgresql.conf` file
 
 ## Prerequisites
@@ -100,7 +97,6 @@ Once all services are running:
 
 - **PostgreSQL Direct Connection**: `localhost:5432`
 - **PgBouncer (Pooled Connection)**: `localhost:6432`
-- **PgAdmin Web Interface**: `http://localhost:5050`
 
 ## Initialization Script Features
 
@@ -166,13 +162,7 @@ This setup is designed to host multiple project databases on a single PostgreSQL
 ### Creating a New Database for a Project
 
 ```bash
-# Method 1: Using psql (with profile)
 docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -c "CREATE DATABASE myproject_db;"
-
-# Method 2: Using PgAdmin web interface
-# 1. Open http://localhost:5050
-# 2. Right-click on "Databases" -> "Create" -> "Database"
-# 3. Enter database name and save
 ```
 
 ### Listing All Databases
@@ -188,9 +178,9 @@ docker compose --profile tools run --rm db_utils list-databases.sh
 docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -d myproject_db
 
 # Connection string for applications
-******localhost:5432/myproject_db
+postgresql://postgres:your_password@localhost:5432/myproject_db
 # Or via PgBouncer (pooled):
-******localhost:6432/myproject_db
+postgresql://postgres:your_password@localhost:6432/myproject_db
 ```
 
 ### Managing Project Database Users
@@ -217,10 +207,10 @@ All configuration is managed through the `.env` file. Key variables include:
 
 #### PostgreSQL Configuration
 ```env
-POSTGRES_USER=postgres          # Database superuser
-POSTGRES_PASSWORD=CHANGE_THIS   # IMPORTANT: Set a strong password!
-POSTGRES_DB=postgres            # System database (don't change)
-POSTGRES_PORT=5432             # Host port mapping
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=CHANGE_THIS_SECURE_PASSWORD_NOW
+POSTGRES_DB=postgres
+POSTGRES_PORT=5432
 ```
 
 #### PgBouncer Configuration
@@ -232,13 +222,6 @@ PGBOUNCER_MIN_POOL_SIZE=10             # Minimum pool size
 PGBOUNCER_RESERVE_POOL_SIZE=5          # Reserve pool size
 PGBOUNCER_SERVER_IDLE_TIMEOUT=600      # Idle timeout (seconds)
 PGBOUNCER_MAX_DB_CONNECTIONS=50        # Max database connections
-```
-
-#### PgAdmin Configuration
-```env
-PGADMIN_EMAIL=admin@example.com                  # Login email
-PGADMIN_PASSWORD=CHANGE_THIS_ADMIN_PASSWORD      # Login password (CHANGE THIS!)
-PGADMIN_PORT=5050                                # Web interface port
 ```
 
 ### Database Initialization
@@ -344,21 +327,6 @@ postgresql://postgres:password@your-vps-ip:5432/database_name
 postgresql://postgres:password@your-vps-ip:6432/database_name
 ```
 
-## Using PgAdmin
-
-1. Open your browser and navigate to `http://localhost:5050` (or `http://your-vps-ip:5050`)
-2. Login with credentials from your `.env` file
-3. Add a new server connection:
-   - **General > Name**: PostgreSQL Server (or any name you prefer)
-   - **Connection > Host**: `postgres` (when PgAdmin is in same Docker network) or your VPS IP
-   - **Connection > Port**: `5432`
-   - **Connection > Maintenance Database**: `postgres`
-   - **Connection > Username**: Your `POSTGRES_USER`
-   - **Connection > Password**: Your `POSTGRES_PASSWORD`
-   - **Save password**: ✓ (optional, for convenience)
-
-Now you can see and manage all databases on the server from PgAdmin.
-
 ## Monitoring & Performance
 
 ### Check All Databases Status
@@ -454,7 +422,6 @@ docker compose logs -f
 # View logs for specific service
 docker compose logs -f postgres
 docker compose logs -f pgbouncer
-docker compose logs -f pgadmin
 ```
 
 ### Update Services
@@ -476,9 +443,8 @@ docker compose up -d --force-recreate
    # Generate strong passwords
    openssl rand -base64 32
    
-   # Update .env file with strong passwords
+   # Update .env file with strong password
    POSTGRES_PASSWORD=<generated-strong-password>
-   PGADMIN_PASSWORD=<another-strong-password>
    ```
 
 2. **Firewall Configuration**:
@@ -489,9 +455,6 @@ docker compose up -d --force-recreate
    
    # Or allow only within VPS local network
    sudo ufw allow from 10.0.0.0/8 to any port 5432
-   
-   # Allow PgAdmin only from your IP
-   sudo ufw allow from YOUR_ADMIN_IP to any port 5050
    ```
 
 3. **Use SSL/TLS for connections**:
@@ -550,15 +513,7 @@ docker compose up -d --force-recreate
    docker compose logs postgres | grep -i "connection\|authentication\|error"
    ```
 
-9. **Limit PgAdmin exposure**:
-   ```bash
-   # PgAdmin is already bound to localhost by default (127.0.0.1:5050:80)
-   # For remote access, use SSH tunnel:
-   ssh -L 5050:localhost:5050 user@your-vps-ip
-   # Then access http://localhost:5050 from your local machine
-   ```
-
-10. **Database connection limits**:
+9. **Database connection limits**:
     ```bash
     # Set per-database connection limits to prevent resource exhaustion
     docker compose --profile tools run --rm db_utils psql -h postgres -U postgres -c "
@@ -568,18 +523,13 @@ docker compose up -d --force-recreate
 
 ### VPS-Specific Configuration
 
-**Resource Limits**: Configure Docker resource limits in docker-compose.yml:
+**Resource Limits**: Docker resource limits are already configured in docker-compose.yml:
 ```yaml
 services:
   postgres:
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '1.0'
-          memory: 1G
+    mem_limit: 2g
+    memswap_limit: 2g
+    cpus: 2.0
 ```
 
 **Data Persistence**: Ensure backups are stored outside the Docker host:
@@ -602,7 +552,6 @@ docker compose logs
 # Ensure ports are not in use
 sudo lsof -i :5432
 sudo lsof -i :6432
-sudo lsof -i :5050
 ```
 
 ### Cannot connect to database
@@ -611,12 +560,6 @@ sudo lsof -i :5050
 2. Check network connectivity: `docker compose --profile tools run --rm db_utils ping postgres`
 3. Verify credentials in `.env` file
 4. Review PostgreSQL logs: `docker compose logs postgres`
-
-### PgAdmin cannot connect to PostgreSQL
-
-- Use hostname `postgres` (not `localhost`) when configuring the server
-- Ensure credentials match those in `.env`
-- Verify PostgreSQL service is healthy: `docker compose ps postgres`
 
 ### Backup/Restore fails
 
@@ -628,7 +571,6 @@ sudo lsof -i :5050
 
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [PgBouncer Documentation](https://www.pgbouncer.org/usage.html)
-- [PgAdmin Documentation](https://www.pgadmin.org/docs/)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
 
 ## License

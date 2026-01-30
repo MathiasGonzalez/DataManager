@@ -130,36 +130,6 @@ fi
 echo ""
 
 # ============================================
-# Validate PgAdmin Configuration
-# ============================================
-echo "Validating PgAdmin configuration..."
-
-if [ -z "$PGADMIN_EMAIL" ]; then
-    warning "PGADMIN_EMAIL is not set (will use default)"
-else
-    success "PGADMIN_EMAIL is set: $PGADMIN_EMAIL"
-fi
-
-if [ -z "$PGADMIN_PASSWORD" ]; then
-    error "PGADMIN_PASSWORD is not set"
-elif [ "$PGADMIN_PASSWORD" = "admin" ]; then
-    warning "PGADMIN_PASSWORD is using default weak value"
-    info "Change this to a secure password for production!"
-elif [ ${#PGADMIN_PASSWORD} -lt 6 ]; then
-    warning "PGADMIN_PASSWORD is too short"
-else
-    success "PGADMIN_PASSWORD is set (length: ${#PGADMIN_PASSWORD} chars)"
-fi
-
-if [ -z "$PGADMIN_PORT" ]; then
-    warning "PGADMIN_PORT is not set (will use default: 5050)"
-else
-    success "PGADMIN_PORT is set: $PGADMIN_PORT"
-fi
-
-echo ""
-
-# ============================================
 # Security Checks
 # ============================================
 echo "Security checks..."
@@ -173,16 +143,6 @@ fi
 # Check if ports conflict
 if [ "$POSTGRES_PORT" = "$PGBOUNCER_PORT" ]; then
     error "POSTGRES_PORT and PGBOUNCER_PORT are the same!"
-    info "These must be different ports"
-fi
-
-if [ "$POSTGRES_PORT" = "$PGADMIN_PORT" ]; then
-    error "POSTGRES_PORT and PGADMIN_PORT are the same!"
-    info "These must be different ports"
-fi
-
-if [ "$PGBOUNCER_PORT" = "$PGADMIN_PORT" ]; then
-    error "PGBOUNCER_PORT and PGADMIN_PORT are the same!"
     info "These must be different ports"
 fi
 

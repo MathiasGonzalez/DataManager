@@ -310,7 +310,6 @@ if [ $START_SERVICES -eq 1 ]; then
     section "Connection Information"
     echo "PostgreSQL Direct:   localhost:${POSTGRES_PORT:-5432}"
     echo "PgBouncer (Pooled):  localhost:${PGBOUNCER_PORT:-6432}"
-    echo "PgAdmin Web UI:      http://localhost:${PGADMIN_PORT:-5050}"
     echo ""
     echo "Default credentials are in your .env file"
     
