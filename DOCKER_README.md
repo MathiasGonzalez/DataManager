@@ -6,7 +6,7 @@ This repository provides a complete Docker Compose-based PostgreSQL database env
 
 The environment consists of the following services:
 
-- **PostgreSQL 16 (Alpine)**: Main database server with extensions support
+- **PostgreSQL (Latest Alpine)**: Main database server with extensions support
 - **PgBouncer**: Connection pooler for efficient database connection management
 - **PgAdmin4**: Web-based database administration interface
 - **db_utils**: Utility container for backup and restore operations

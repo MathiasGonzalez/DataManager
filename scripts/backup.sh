@@ -14,6 +14,15 @@ DB_HOST="${POSTGRES_HOST:-postgres}"
 DB_PORT="${POSTGRES_PORT:-5432}"
 BACKUP_DIR="/backups"
 
+# Try to resolve hostname, fallback to getent or direct connection
+if ! ping -c 1 -W 1 ${DB_HOST} >/dev/null 2>&1; then
+    # Try to get IP from /etc/hosts or links
+    DB_IP=$(grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+[[:space:]]+(datamanager_)?postgres" /etc/hosts | head -1 | awk '{print $1}')
+    if [ -n "$DB_IP" ]; then
+        DB_HOST="$DB_IP"
+    fi
+fi
+
 # Generate timestamp for backup filename
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_backup_${TIMESTAMP}.sql"
