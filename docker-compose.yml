@@ -4,13 +4,13 @@ services:
   # ============================================
   postgres:
     image: postgres:alpine
-    container_name: datamanager_postgres
+    container_name: postgres_server
     restart: unless-stopped
     environment:
       # Database credentials
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-datamanager}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
       # Performance tuning
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
       # Enable statistics extension
@@ -30,7 +30,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      datamanager_network:
+      postgres_network:
         aliases:
           - postgres
           - db
@@ -40,11 +40,11 @@ services:
   # ============================================
   pgbouncer:
     image: edoburu/pgbouncer:latest
-    container_name: datamanager_pgbouncer
+    container_name: postgres_pgbouncer
     restart: unless-stopped
     environment:
-      # Database connection
-      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-datamanager}"
+      # Database connection - Using wildcard to support multiple databases
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/*"
       # Connection pool configuration
       POOL_MODE: transaction
       MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-100}
@@ -60,14 +60,14 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - datamanager_network
+      - postgres_network
 
   # ============================================
   # PgAdmin4 - Web-based Database Administration
   # ============================================
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: datamanager_pgadmin
+    container_name: postgres_pgadmin
     restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
@@ -85,19 +85,19 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - datamanager_network
+      - postgres_network
 
   # ============================================
   # Database Utilities - Backup & Restore
   # ============================================
   db_utils:
     image: postgres:alpine
-    container_name: datamanager_db_utils
+    container_name: postgres_db_utils
     restart: "no"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-datamanager}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -106,7 +106,9 @@ services:
       - ./backups:/backups
       # Backup and restore scripts
       - ./scripts/backup.sh:/usr/local/bin/backup.sh
+      - ./scripts/backup-all.sh:/usr/local/bin/backup-all.sh
       - ./scripts/restore.sh:/usr/local/bin/restore.sh
+      - ./scripts/list-databases.sh:/usr/local/bin/list-databases.sh
     entrypoint: ["/bin/sh"]
     command: ["-c", "chmod +x /usr/local/bin/*.sh && tail -f /dev/null"]
     depends_on:
@@ -115,23 +117,23 @@ services:
     links:
       - postgres
     networks:
-      - datamanager_network
+      - postgres_network
 
 # ============================================
 # Networks
 # ============================================
 networks:
-  datamanager_network:
+  postgres_network:
     driver: bridge
-    name: datamanager_network
+    name: postgres_network
 
 # ============================================
 # Volumes
 # ============================================
 volumes:
   postgres_data:
-    name: datamanager_postgres_data
+    name: postgres_data
     driver: local
   pgadmin_data:
-    name: datamanager_pgadmin_data
+    name: postgres_pgadmin_data
     driver: local
