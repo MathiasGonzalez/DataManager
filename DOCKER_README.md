@@ -21,41 +21,114 @@ The environment consists of the following services:
 
 ## 🚀 Quick Start
 
-### 1. Initial Setup
+### Method 1: Using the Initialization Script (Recommended)
 
-Clone the repository and create your environment configuration:
+The easiest way to get started is using the automated initialization script:
 
 ```bash
-# Copy the example environment file
+# Initialize environment (creates .env, validates configuration)
+./init.sh
+
+# Edit the .env file with secure passwords
+nano .env
+
+# Validate your configuration
+./init.sh --validate
+
+# Start all services
+./init.sh --start
+
+# Check services status
+./init.sh --status
+```
+
+### Method 2: Manual Setup
+
+If you prefer manual setup:
+
+```bash
+# 1. Copy the example environment file
 cp .env.example .env
 
-# IMPORTANT: Edit .env and change the default password!
+# 2. IMPORTANT: Edit .env and change default passwords!
 nano .env  # or use your favorite editor
 
-# Generate a strong password for production use
-# Example: openssl rand -base64 32
-```
+# 3. Validate environment variables
+./scripts/env-check.sh
 
-### 2. Start the Environment
-
-```bash
-# Start all services
+# 4. Start all services
 docker compose up -d
 
-# Check service status
+# 5. Check service status
 docker compose ps
-
-# View logs
-docker compose logs -f
 ```
 
-### 3. Access Services
+### Important: Environment Validation
+
+**Always validate your environment before starting services:**
+
+```bash
+# Validate configuration
+./scripts/env-check.sh
+
+# Strict mode (fails on warnings)
+./scripts/env-check.sh --strict
+```
+
+The validation script checks:
+- ✓ Required environment variables are set
+- ✓ Passwords are not using default/weak values
+- ✓ Port conflicts
+- ✓ Security configurations
 
 Once all services are running:
 
 - **PostgreSQL Direct Connection**: `localhost:5432`
 - **PgBouncer (Pooled Connection)**: `localhost:6432`
 - **PgAdmin Web Interface**: `http://localhost:5050`
+
+## 🛠️ Initialization Script Features
+
+The `init.sh` script provides idempotent initialization and management:
+
+### Available Commands
+
+```bash
+./init.sh              # Initialize only (create .env, validate, setup dirs)
+./init.sh --start      # Initialize and start services
+./init.sh --stop       # Stop all services
+./init.sh --restart    # Restart all services
+./init.sh --status     # Check services status
+./init.sh --validate   # Validate environment only
+./init.sh --help       # Show help message
+```
+
+### What the Initialization Does
+
+1. **Checks Prerequisites**: Verifies Docker and Docker Compose are installed
+2. **Creates .env File**: Copies from .env.example if not exists
+3. **Validates Environment**: Runs comprehensive validation checks
+4. **Creates Directories**: Sets up required directories (backups, etc.)
+5. **Sets Permissions**: Makes all scripts executable
+6. **Optionally Starts Services**: With `--start` flag
+
+### Environment Validation
+
+The `env-check.sh` script validates:
+
+- ✅ All required environment variables are set
+- ✅ Passwords are secure (not defaults/placeholders)
+- ✅ Password strength (minimum length)
+- ✅ No port conflicts between services
+- ✅ Security configurations
+
+```bash
+# Run validation independently
+./scripts/env-check.sh
+
+# Strict mode (exit on warnings)
+./scripts/env-check.sh --strict
+```
 
 ## 🗄️ Multi-Database Management
 
